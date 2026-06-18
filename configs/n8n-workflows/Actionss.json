@@ -1,0 +1,111 @@
+{
+  "name": "Actionss",
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "ip_address"
+            },
+            {
+              "name": "action"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "849d99c1-434c-465a-896e-05b4bc1143e8",
+      "name": "When Executed by Another Workflow"
+    },
+    {
+      "parameters": {
+        "jsCode": "const ip     = $input.first().json.ip_address?.trim() || '';\nconst action = $input.first().json.action?.trim().toLowerCase() || '';\n\nreturn { ip, action };"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        0
+      ],
+      "id": "04b2d60f-c082-4b73-a4f7-849f865aee75",
+      "name": "Extract Fields"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={YOUR_HOST_URL}:9204/{{ $json.action }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer soc-secret-2025-autosoc"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"ip\": \"{{ $json.ip }}\"\n}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        480,
+        0
+      ],
+      "id": "c54491e0-34c8-43a3-80c8-c323fc91270d",
+      "name": "Call SOC Microservice",
+      "onError": "continueRegularOutput"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Extract Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Fields": {
+      "main": [
+        [
+          {
+            "node": "Call SOC Microservice",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "ab50d5f8-2a4a-4ce2-a658-bd2c3d2402f0",
+  "meta": {
+    "instanceId": "97d8fcde9139968198c36c9498d3ea18cc0f9ef2269678200d2f764633fcfce9"
+  },
+  "id": "RtSpmdZ7gfVFZdGl",
+  "tags": []
+}

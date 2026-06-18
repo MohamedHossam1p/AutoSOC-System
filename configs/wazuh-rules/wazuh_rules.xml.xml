@@ -1,0 +1,110 @@
+<!-- Local rules -->
+
+<!-- Modify it at your will. -->
+<!-- Copyright (C) 2015, Wazuh Inc. -->
+
+<!-- Example -->
+
+  <!--
+  Dec 10 01:02:02 host sshd[1234]: Failed none for root from 1.1.1.1 port 1066 ssh2
+<!-- ======================================================== -->
+<!--           Custom Rules - Mohamed - Feb 2026            -->
+<!--          All rules merged in one organized file        -->
+<!-- ======================================================== -->
+<!-- ======================================================== -->
+<!--           Custom Rules - Mohamed - Feb 2026            -->
+<!-- ======================================================= -->
+
+<group name="ssh,authentication,brute_force,">
+  <rule id="100050" level="15">
+    <if_sid>5710</if_sid>
+    <description>SSH invalid/non-existent user attempt - CRITICAL</description>
+    <mitre><id>T1110.001</id></mitre>
+    <group>authentication_failed,brute_force,critical,</group>
+  </rule>
+
+  <rule id="100051" level="15" timeframe="120" frequency="4">
+    <if_matched_sid>5710</if_matched_sid>
+    <description>Multiple SSH invalid user attempts - BRUTE FORCE CRITICAL</description>
+    <mitre><id>T1110</id></mitre>
+    <group>authentication_failures,brute_force,attack,critical,</group>
+  </rule>
+</group>
+
+<group name="windows,authentication,rdp,">
+  <rule id="100060" level="14">
+    <if_sid>60103</if_sid>
+    <description>Windows failed logon attempt - HIGH severity</description>
+    <group>authentication_failed,windows,brute_force,</group>
+  </rule>
+
+  <rule id="100100" level="14">
+    <if_sid>60103</if_sid>
+    <field name="win.eventdata.logonType">10</field>
+    <description>RDP failed logon attempt - HIGH severity</description>
+    <mitre><id>T1021.001</id></mitre>
+    <group>authentication_failed,windows,rdp,brute_force,</group>
+  </rule>
+
+  <rule id="100061" level="15" timeframe="180" frequency="5">
+    <if_matched_sid>60103</if_matched_sid>
+    <description>Multiple Windows failed logons - BRUTE FORCE CRITICAL</description>
+    <group>authentication_failures,windows,brute_force,critical,</group>
+  </rule>
+</group>
+<group name="linux,sudo,privilege_escalation,">
+  <rule id="100110" level="5">
+    <if_sid>5503</if_sid>
+    <description>Sudo authentication failure - Single attempt</description>
+    <mitre><id>T1548.003</id></mitre>
+    <group>authentication_failed,sudo,privilege_escalation,</group>
+  </rule>
+
+  <rule id="100111" level="15" frequency="3" timeframe="120">
+    <if_matched_sid>100110</if_matched_sid>
+    <description>CRITICAL: Multiple failed sudo attempts (Possible Privilege Escalation / Brute Force)</description>
+    <mitre>
+      <id>T1110.001</id>
+      <id>T1548.003</id>
+    </mitre>
+    <group>privilege_escalation, attack, critical,</group>
+  </rule>
+
+  <rule id="100112" level="15">
+    <if_group>syslog</if_group>
+    <match>to group 'sudo'|to group 'root'</match>
+    <description>CRITICAL: User added to SUDO/ROOT group! (Possible Backdoor/Persistence)</description>
+    <mitre><id>T1098</id></mitre>
+    <group>persistence, privilege_escalation,</group>
+  </rule>
+</group>
+
+<group name="malware,execution,suspicious,">
+  <rule id="100120" level="14">
+    <if_sid>184676</if_sid>
+    <match>/tmp/evil|/var/tmp/.*\.exe|/dev/shm/.*|%TEMP%\\evil</match>
+    <description>Suspicious file creation in malware-common path - HIGH</description>
+    <mitre><id>T1059</id></mitre>
+    <group>malware,execution,file_creation,suspicious,</group>
+  </rule>
+
+  <rule id="100121" level="15">
+    <if_sid>184676</if_sid>
+    <match>powershell -enc|certutil -urlcache|bitsadmin /transfer|rundll32 javascript|mshta vbscript</match>
+    <description>Suspicious/malicious process execution - CRITICAL</description>
+    <mitre><id>T1059.001</id><id>T1218</id></mitre>
+    <group>malware,execution,defense_evasion,critical,</group>
+  </rule>
+</group>
+
+<group name="syscheck, file_modification,">
+  <rule id="100113" level="15">
+    <if_sid>550, 553, 554</if_sid>
+    <match>secret_passwords.txt</match>
+    <description>CRITICAL: Highly Sensitive File Modified, Created or Deleted!</description>
+    <mitre><id>T1565.001</id></mitre>
+    <group>syscheck, file_modification,</group>
+  </rule>
+</group>
+
+

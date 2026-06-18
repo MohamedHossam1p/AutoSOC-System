@@ -1,0 +1,1165 @@
+{
+  "name": "AutoSOC System1",
+  "nodes": [
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "models/gemini-2.5-flash",
+          "mode": "list",
+          "cachedResultName": "models/gemini-2.5-flash"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "=You are a Senior Expert SOC Analyst. I will provide you with raw JSON data regarding a recent cyber attack. \nWrite a concise, professional security alert. Use English ONLY. Do not include any Arabic text.\n\nFormat the alert EXACTLY using HTML tags for bolding (<b>text</b>). DO NOT use asterisks (**) for formatting. DO NOT use any emojis except for the two sirens at the top.\n\n🚨 <b>New Security Alert Detected</b> 🚨\n━━━━━━━━━━━━━━━━━━\n<b>Attacker IP:</b> (Extract IP)\n<b>ISP / Organization:</b> (Extract ISP)\n<b>Location:</b> (Extract Country/City)\n<b>Malicious Score:</b> (Extract Score)\n<b>Attack Details:</b> (Briefly summarize)\n\n<b>Suggestion Action:</b> (Provide 1 actionable recommendation based on the attack type).\n━━━━━━━━━━━━━━━━━━\n\nRaw data to analyze:\n{{ JSON.stringify($node[\"Risk Score Engine\"].json, null, 2) }}"
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1.1,
+      "position": [
+        -1520,
+        -864
+      ],
+      "id": "d156b2b1-9524-439b-8948-26ebd332d1a2",
+      "name": "Message a model1",
+      "retryOnFail": true,
+      "credentials": {
+        "googlePalmApi": {
+          "id": "hiL3qidzgVYxbTnw",
+          "name": "Wazuh Gemini"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "df934d7f-4280-4c05-ac50-14f28185727c",
+              "leftValue": "={{ $json.body?.all_fields?.data?.srcip || $json.body?.body?.all_fields?.data?.srcip || '' }}",
+              "rightValue": "192.",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -5056,
+        -1136
+      ],
+      "id": "81408452-5445-4321-98f9-08af24ba7b4d",
+      "name": "Traffic Origin Classifier"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "17c06a32-139a-4ff9-af34-f29ea238361b",
+              "leftValue": "={{ $json.RuleLevel }}",
+              "rightValue": 10,
+              "operator": {
+                "type": "number",
+                "operation": "gte"
+              }
+            },
+            {
+              "id": "4026fefd-9c7a-4b2f-baeb-ddda7b92aa53",
+              "leftValue": "={{ $json['IP - Checker '] }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -4208,
+        -880
+      ],
+      "id": "d5484a61-f61f-4a33-9329-a3ee97904281",
+      "name": "Is Alert Valid"
+    },
+    {
+      "parameters": {
+        "url": "https://api.abuseipdb.com/api/v2/check",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "ipAddress",
+              "value": "={{ $json.ip }}"
+            },
+            {
+              "name": "maxAgeInDays",
+              "value": "90"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -3856,
+        -864
+      ],
+      "id": "2d7bcdbf-1576-4c4a-a7d8-6f29874758c9",
+      "name": "AbuseIPDB — IP Reputation Check",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "QAJ4IY4Iw8AsNkuy",
+          "name": "AbuseIPDB_Secure_Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "88343259-8eb2-4dce-8e3b-cd19f35b641a",
+              "leftValue": "={{ $json.data.abuseConfidenceScore }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gte"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -3536,
+        -864
+      ],
+      "id": "0d3dc395-e8f3-47ae-ae66-2b623d50cc33",
+      "name": "AbuseIPDB Score Validator"
+    },
+    {
+      "parameters": {
+        "url": "https://api.ipgeolocation.io/ipgeo",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "ip",
+              "value": "={{ $json.data.ipAddress }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -3216,
+        -880
+      ],
+      "id": "155a317d-f888-4c7f-b5b1-0520b3a12598",
+      "name": "IPGeolocation — Geo Enrichment",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "QAJ4IY4Iw8AsNkuy",
+          "name": "AbuseIPDB_Secure_Key"
+        },
+        "httpQueryAuth": {
+          "id": "DNnKEELp4obQn7pa",
+          "name": "ipGEO_Secure_Key"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "url": "=https://www.virustotal.com/api/v3/ip_addresses/{{ $json.ip }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": []
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -2880,
+        -880
+      ],
+      "id": "2d9e8e9b-74f4-465b-90de-f21366370dd0",
+      "name": "VirusTotal — Threat Intelligence Lookup",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "AznwNazj6EtFdOtN",
+          "name": "VirusTotal_Secure_Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const abuseData = $node[\"AbuseIPDB — IP Reputation Check\"].json.data;\nconst vtData = $node[\"VirusTotal — Threat Intelligence Lookup\"].json.data.attributes;\nconst geoData = $node[\"IPGeolocation — Geo Enrichment\"].json;\n\n// ── 1. Core Inputs & Base Data ──────────────────────────\nconst abuseScore     = abuseData.abuseConfidenceScore || 0;\nconst vtMalicious    = vtData.last_analysis_stats.malicious || 0;\nconst vtSuspicious   = vtData.last_analysis_stats.suspicious || 0;\nconst isTor          = abuseData.isTor || false;\nconst totalReports   = abuseData.totalReports || 0;\nconst distinctUsers  = abuseData.numDistinctUsers || 0;\nconst usageType      = abuseData.usageType || \"\";        // e.g., \"Data Center/Web Hosting\", \"ISP\"\nconst lastReportedAt = abuseData.lastReportedAt || null; // e.g., \"2024-11-01T12:00:00+00:00\"\n\n// ── 2. Attack Type Context (From Wazuh Alert) ──────────\nconst ruleDescription = ($node[\"Receive Wazuh Alert\"].json?.body?.all_fields?.rule?.description || \"\").toLowerCase();\nconst mitreTactics    = $node[\"Receive Wazuh Alert\"].json?.body?.all_fields?.rule?.mitre?.tactic || [];\n\nlet attackTypeBonus = 0;\nif (ruleDescription.includes(\"brute force\") || ruleDescription.includes(\"ssh\"))  attackTypeBonus = 20;\nelse if (ruleDescription.includes(\"sql injection\") || ruleDescription.includes(\"web attack\")) attackTypeBonus = 15;\nelse if (ruleDescription.includes(\"scan\") || ruleDescription.includes(\"recon\"))  attackTypeBonus = 8;\nelse if (ruleDescription.includes(\"malware\") || ruleDescription.includes(\"trojan\")) attackTypeBonus = 25;\n\n// ── 3. IP Recency Evaluation (Fresher reports = Higher risk) ───────────\nlet freshnessBonus = 0;\nif (lastReportedAt) {\n  const daysSinceReport = (Date.now() - new Date(lastReportedAt).getTime()) / (1000 * 60 * 60 * 24);\n  if (daysSinceReport <= 1)       freshnessBonus = 15;  // Reported today/yesterday (Highly active)\n  else if (daysSinceReport <= 7)  freshnessBonus = 10;\n  else if (daysSinceReport <= 30) freshnessBonus = 5;\n}\n\n// ── 4. IP Usage Type (Data Centers are generally riskier than standard ISPs) ─\nlet usageBonus = 0;\nif (usageType.toLowerCase().includes(\"data center\") || usageType.toLowerCase().includes(\"hosting\")) usageBonus = 8;\n\n// ── 5. Final Risk Score Calculation ──────────────────────\nlet score = 0;\nscore += abuseScore * 0.35;           // Give AbuseIPDB score a 35% overall weight\nscore += vtMalicious * 3.5;           // Each detecting VT engine adds a heavy penalty (3.5 points)\nscore += vtSuspicious * 1.5;\nscore += isTor ? 15 : 0;              // Immediate penalty if the IP is an active Tor node\nscore += Math.min(distinctUsers * 0.3, 10); // Multiple distinct reporters indicate higher risk (capped at 10)\nscore += attackTypeBonus;\nscore += freshnessBonus;\nscore += usageBonus;\n\n// Ensure the final score strictly stays within the 0-100 range\nscore = Math.min(Math.max(Math.round(score), 0), 100);\n\n// ── 6. Risk Level Classification ─────────────────────────\nlet riskLevel;\nif (score >= 85)      riskLevel = \"CRITICAL\";\nelse if (score >= 65) riskLevel = \"HIGH\";\nelse if (score >= 40) riskLevel = \"MEDIUM\";\nelse                  riskLevel = \"LOW\";\n\nreturn {\n  final_risk_score: score,\n  risk_level: riskLevel,\n  attacker_ip: abuseData.ipAddress,\n  country_official: geoData.country_name_official,\n  location: `${geoData.country_name} (${geoData.city})`,\n  isp: geoData.isp,\n  is_tor: isTor,\n  reports_count: totalReports,\n  distinct_users: distinctUsers,\n  attack_type: ruleDescription || \"unknown\",\n  usage_type: usageType,\n  days_since_last_report: lastReportedAt\n    ? Math.round((Date.now() - new Date(lastReportedAt).getTime()) / 86400000)\n    : null,\n  is_high_risk: score >= 65,\n  should_block: score >= 75 \n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2592,
+        -880
+      ],
+      "id": "4308f0d8-9808-410b-aca9-7bd51f27ea17",
+      "name": "Risk Score Engine"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "46565a65-648c-4d07-9a4e-f4d5fb099361",
+              "leftValue": "={{ $json.should_block }}",
+              "rightValue": 75,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -2000,
+        -880
+      ],
+      "id": "ba4d4992-d69e-4fd3-8cf6-0c4daf96cdfa",
+      "name": "Block Decision Gate"
+    },
+    {
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -1968,
+        -576
+      ],
+      "id": "7ea56843-c638-4cc9-99a4-73ae5cdf61ae",
+      "name": "Telegram — Chatbot Trigger",
+      "webhookId": "4ddbc350-09b3-471d-8c80-1306e9ab96dc",
+      "credentials": {
+        "telegramApi": {
+          "id": "p58Mz7wzTpUPp2Yj",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.message.text }}",
+        "options": {
+          "systemMessage": "You are a SOC security assistant with firewall control.\nYou can: block, unblock, check, list-blocked, flush IPs.\nWhen asked, call the firewall tool with the correct action and ip_address.\nFor list-blocked and flush, ip_address can be empty."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        -1488,
+        -576
+      ],
+      "id": "b4364a23-5397-452e-82c6-070652a5a1c5",
+      "name": "SOC AI Assistant Agent"
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $json.message.chat.id }}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [
+        -1552,
+        -336
+      ],
+      "id": "68e9b637-9b20-44ad-81f8-0da52568e579",
+      "name": "Conversation Memory Buffer"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "49f68d7e-e462-4032-8a10-0ec173a18869",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -5328,
+        -1136
+      ],
+      "id": "a5a11123-db90-4818-aff5-fd7f5b667cb2",
+      "name": "Receive Wazuh Alert",
+      "webhookId": "49f68d7e-e462-4032-8a10-0ec173a18869"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "121843a8-4aa7-43d0-a2bf-543c5efe0135",
+              "leftValue": "={{ $json.body?.all_fields?.data?.srcip || $json.body?.body?.all_fields?.data?.srcip || '' }}",
+              "rightValue": "192.168.",
+              "operator": {
+                "type": "string",
+                "operation": "startsWith"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -4672,
+        -1152
+      ],
+      "id": "da1bb7fa-50e6-45d4-ac0b-d13573fda2b8",
+      "name": "Route: Internal vs External IP1"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "c568d1b5-0f5f-436a-9b4e-d0be3b3044c9",
+              "name": "ip",
+              "value": "={{ $json?.body?.body?.all_fields?.data?.srcip || $json?.body?.all_fields?.data?.srcip || $json?.body?.text?.match(/rhost=([\\d\\.]+)/)?.[1] || \"No IP\" }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -4464,
+        -880
+      ],
+      "id": "b249cb43-8c16-4b35-85f2-68f7e9fefe9f",
+      "name": "Parse Wazuh Payload"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "98847067-a572-43c1-ba11-dbbfe430f23e",
+              "name": "server_name",
+              "value": "={{ $json.body.all_fields.agent.name }}",
+              "type": "string"
+            },
+            {
+              "id": "cc0b3b5d-1617-4380-821f-de7698e535a3",
+              "name": "user_name",
+              "value": "={{ $json.body.all_fields.data.srcuser }}",
+              "type": "string"
+            },
+            {
+              "id": "86520afc-5aa0-4022-a268-1433b0bbb65c",
+              "name": "Rule-ID",
+              "value": "={{ $json.body.rule_id }}",
+              "type": "string"
+            },
+            {
+              "id": "3f9a8fd3-8e1c-4f2e-893a-82e1f310f811",
+              "name": "alert_desc",
+              "value": "={{ $json.body.all_fields.rule.description }}",
+              "type": "string"
+            },
+            {
+              "id": "ebbd74b3-19fc-4ef3-a747-553a66e6bf4c",
+              "name": "severity",
+              "value": "={{ $json.body.all_fields.rule.level }}",
+              "type": "string"
+            },
+            {
+              "id": "60dcb3f3-a287-4238-9110-fa5e55ebbd89",
+              "name": "Tactic",
+              "value": "={{ $json.body.all_fields.rule.mitre.tactic }}",
+              "type": "array"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -4480,
+        -624
+      ],
+      "id": "d75d3b3c-bae6-4e1b-a6fd-3232d4d2caa2",
+      "name": "Format Internal Alert"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "5d9c9504-c4c3-48f1-953d-f1dbf00ea0ca",
+              "leftValue": "={{ $json.severity }}",
+              "rightValue": "=9",
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -4192,
+        -624
+      ],
+      "id": "36794c18-a98d-4350-a7b1-34dde4f7c1ae",
+      "name": "Check Internal Threat"
+    },
+    {
+      "parameters": {
+        "chatId": "981499938",
+        "text": "={{ $json.content.parts[0].text }}",
+        "additionalFields": {
+          "parse_mode": "HTML"
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -928,
+        -864
+      ],
+      "id": "1ca48e57-8050-45b5-8c53-44095a0dc633",
+      "name": "Telegram Notify - SOC Alert",
+      "webhookId": "659036c2-d84a-4f7f-9a1c-3e7c86047606",
+      "credentials": {
+        "telegramApi": {
+          "id": "p58Mz7wzTpUPp2Yj",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "981499938",
+        "text": "=🚨 CRITICAL INTERNAL ALERT 🚨\n━━━━━━━━━━━━━━━━━━\n🖥️ Server: --{{ $json.server_name }}--\n\n👤 User: --{{ $json.user_name }}--\n\n⚠️ Threat Details:\n• Rule ID: __{{ $json[\"Rule-ID\"] }}--\n• Tactic: __{{ $json.Tactic.join(' | ') }}__\n\n📝 Description: __{{ $json.alert_desc }}__\n\n🔴 Severity: _____Level {{ $json.severity }}_____ 🔴\n━━━━━━━━━━━━━━━━━━",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -3856,
+        -640
+      ],
+      "id": "13b27b57-45e6-4abe-ac46-2eac378651e3",
+      "name": "Telegram Notify - Internal Alert",
+      "webhookId": "cf3cd2dc-22cf-4078-a088-94896d704e10",
+      "credentials": {
+        "telegramApi": {
+          "id": "p58Mz7wzTpUPp2Yj",
+          "name": "Telegram account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "chatId": "981499938",
+        "text": "=🚨 CRITICAL SECURITY ALERT 🚨\n━━━━━━━━━━━━━━━━━━━━━━\n⚠️ Threat: {{ $('Receive Wazuh Alert').item.json.body?.title || $('Receive Wazuh Alert').item.json.body?.rule?.description || 'Unknown Threat' }}\n\n🌐 Source IP: {{ $('Receive Wazuh Alert').item.json.body?.data?.srcip || $('Receive Wazuh Alert').item.json.body?.all_fields?.data?.srcip || 'Local/Internal' }}\n\n🎯 MITRE ATT&CK ID: {{ $('Receive Wazuh Alert').item.json.body?.rule?.mitre?.id?.[0] || $('Receive Wazuh Alert').item.json.body?.all_fields?.rule?.mitre?.id?.[0] || 'N/A' }}\n━━━━━━━━━━━━━━━━━━━━━━\n🛡️ Action Taken: Threat isolated automatically via SOC n8n.",
+        "additionalFields": {
+          "parse_mode": "HTML"
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -912,
+        -1168
+      ],
+      "id": "86fd8a7f-6447-49d9-9046-58cbbe890522",
+      "name": "Telegram Notify - Block Success",
+      "webhookId": "c2d3a492-dbd4-452b-a3e9-afd4b35c36be",
+      "credentials": {
+        "telegramApi": {
+          "id": "p58Mz7wzTpUPp2Yj",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://192.168.202.129:9203/soc-live-alerts/_doc",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"attacker_ip\": \"{{ $json.attacker_ip }}\",\n  \"country\": \"{{ $json.location }}\",\n  \"risk_score\": {{ $json.final_risk_score || 0 }},\n  \"isp\": \"{{ $json.isp }}\",\n  \"is_tor\": {{ $json.is_tor || false }},\n  \"reports\": {{ $json.reports_count || 0 }},\n  \"lat\": {{ $('IPGeolocation — Geo Enrichment').first().json.latitude || 0 }},\n  \"lon\": {{ $('IPGeolocation — Geo Enrichment').first().json.longitude || 0 }},\n  \"@timestamp\": \"{{ $now.toISO() }}\",\n  \"rule\": {\n    \"level\": {{ $('Receive Wazuh Alert').first().json.body?.all_fields?.rule?.level || $('Receive Wazuh Alert').first().json.body?.rule?.level || 0 }},\n    \"description\": \"{{ $('Receive Wazuh Alert').first().json.body?.all_fields?.rule?.description || $('Receive Wazuh Alert').first().json.body?.rule?.description || 'Unknown Threat' }}\",\n    \"id\": \"{{ $('Receive Wazuh Alert').first().json.body?.all_fields?.rule?.id || $('Receive Wazuh Alert').first().json.body?.rule?.id || 'Unknown ID' }}\",\n    \"mitre\": {\n      \"tactic\": {{ JSON.stringify($('Receive Wazuh Alert').first().json.body?.all_fields?.rule?.mitre?.tactic || $('Receive Wazuh Alert').first().json.body?.rule?.mitre?.tactic || []) }}\n    }\n  },\n  \"agent\": {\n    \"name\": \"{{ $('Receive Wazuh Alert').first().json.body?.all_fields?.agent?.name || $('Receive Wazuh Alert').first().json.body?.agent?.name || 'Unknown Agent' }}\"\n  },\n  \"data\": {\n    \"srcip\": \"{{ $json.attacker_ip }}\"\n  }\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -2272,
+        -880
+      ],
+      "id": "a52d32f4-c1c6-4690-827a-ea0ff566db74",
+      "name": "Save to Elastic"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1k5n1Aujqpyi1A9Qsq0EVYD8yu0dM9BOk6yTtMZuL6UM",
+          "mode": "list",
+          "cachedResultName": "block ip's list",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1k5n1Aujqpyi1A9Qsq0EVYD8yu0dM9BOk6yTtMZuL6UM/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1k5n1Aujqpyi1A9Qsq0EVYD8yu0dM9BOk6yTtMZuL6UM/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Malicous_IP": "={{ $('False Positive Check').first().json.attacker_ip }}",
+            "Action_Taken": "Blocked by Active Response",
+            "Timestamp": "={{ $now.toISO() }}"
+          },
+          "matchingColumns": [
+            "Malicous_IP"
+          ],
+          "schema": [
+            {
+              "id": "Malicous_IP",
+              "displayName": "Malicous_IP",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Risk_Score",
+              "displayName": "Risk_Score",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Location",
+              "displayName": "Location",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Action_Taken",
+              "displayName": "Action_Taken",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Timestamp",
+              "displayName": "Timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -1136,
+        -1536
+      ],
+      "id": "d362e476-0df8-4135-8ec9-c71198c0b5b7",
+      "name": "Append row in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "scPbxOpBCvOHq1h7",
+          "name": "Google Sheets account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// الـ IP جاي من الـ webhook مباشرة\nconst ip = $node[\"Route: Internal vs External IP1\"].json.body?.all_fields?.data?.srcip || \n           $node[\"Route: Internal vs External IP1\"].json.body?.data?.srcip || \n           \"unknown\";\n\nconst token = $json.data.token;\n\nconst whitelist = [\"8.8.8.8\", \"1.1.1.1\", \"208.67.222.222\"];\nconst isWhite   = whitelist.includes(ip);\n\nreturn {\n  attacker_ip:  ip,\n  token:        token,\n  should_block: !isWhite,\n  reason:       isWhite ? \"whitelisted\" : \"proceed_to_block\"\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1424,
+        -1168
+      ],
+      "id": "5f8cb84a-823c-43f4-bb36-364af96a1a3a",
+      "name": "False Positive Check"
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "https://192.168.202.129:55000/active-response",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $node[\"False Positive Check\"].json.token }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"command\": \"firewall-drop\",\n  \"custom\": false,\n  \"arguments\": [\"{{ $node['False Positive Check'].json.attacker_ip }}\"]\n}",
+        "options": {
+          "allowUnauthorizedCerts": true
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -1136,
+        -1168
+      ],
+      "id": "ba1f1d69-4f57-4b06-ab83-0d8250d1de9a",
+      "name": "Wazuh API AR",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "url": "https://192.168.202.129:55000/security/user/authenticate",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "options": {
+          "allowUnauthorizedCerts": true
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -1712,
+        -1168
+      ],
+      "id": "85c17063-a7aa-437a-a2a1-1ac6ba2ca0d8",
+      "name": "Token generation",
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "VPvQVwSpjYUWosQR",
+          "name": "wazuh Active Response"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": "openai/gpt-oss-20b",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "typeVersion": 1,
+      "position": [
+        -1728,
+        -336
+      ],
+      "id": "34018292-1a38-4b85-881e-8a1cb12114f0",
+      "name": "Groq Chat Model",
+      "credentials": {
+        "groqApi": {
+          "id": "ifSPQM1JkP7Qz7oG",
+          "name": "Groq account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $node[\"Telegram — Chatbot Trigger\"].json[\"message\"][\"chat\"][\"id\"] }}",
+        "text": "={{ $json.output }}",
+        "additionalFields": {
+          "parse_mode": "HTML"
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -960,
+        -576
+      ],
+      "id": "3b1850cc-e200-40bc-b5de-4e7655acb46a",
+      "name": "Telegram — AI Assistant Response",
+      "webhookId": "add29e1e-f7b2-4b6f-b2d6-96408b407757",
+      "credentials": {
+        "telegramApi": {
+          "id": "p58Mz7wzTpUPp2Yj",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "description": "Use this tool to block or unblock an IP address.\nExtract the action (block or unblock) and the IP from the user message.\n",
+        "workflowId": {
+          "__rl": true,
+          "value": "RtSpmdZ7gfVFZdGl",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/RtSpmdZ7gfVFZdGl",
+          "cachedResultName": "Actionss"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "ip_address": "={{ $fromAI('ip_address') }}",
+            "action": "={{ $fromAI('action') }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "ip_address",
+              "displayName": "ip_address",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "action",
+              "displayName": "action",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        -1344,
+        -368
+      ],
+      "id": "74d5fddc-eab6-4727-abc4-95b77dd9dd6d",
+      "name": "Call 'Actions'1"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Message a model1": {
+      "main": [
+        [
+          {
+            "node": "Telegram Notify - SOC Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Traffic Origin Classifier": {
+      "main": [
+        [
+          {
+            "node": "Route: Internal vs External IP1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Format Internal Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Alert Valid": {
+      "main": [
+        [],
+        [
+          {
+            "node": "AbuseIPDB — IP Reputation Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AbuseIPDB — IP Reputation Check": {
+      "main": [
+        [
+          {
+            "node": "AbuseIPDB Score Validator",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AbuseIPDB Score Validator": {
+      "main": [
+        [
+          {
+            "node": "IPGeolocation — Geo Enrichment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IPGeolocation — Geo Enrichment": {
+      "main": [
+        [
+          {
+            "node": "VirusTotal — Threat Intelligence Lookup",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "VirusTotal — Threat Intelligence Lookup": {
+      "main": [
+        [
+          {
+            "node": "Risk Score Engine",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Risk Score Engine": {
+      "main": [
+        [
+          {
+            "node": "Save to Elastic",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Block Decision Gate": {
+      "main": [
+        [
+          {
+            "node": "Token generation",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Message a model1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Telegram — Chatbot Trigger": {
+      "main": [
+        [
+          {
+            "node": "SOC AI Assistant Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SOC AI Assistant Agent": {
+      "main": [
+        [
+          {
+            "node": "Telegram — AI Assistant Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Conversation Memory Buffer": {
+      "ai_memory": [
+        [
+          {
+            "node": "SOC AI Assistant Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Receive Wazuh Alert": {
+      "main": [
+        [
+          {
+            "node": "Traffic Origin Classifier",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route: Internal vs External IP1": {
+      "main": [
+        [
+          {
+            "node": "Token generation",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Parse Wazuh Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Wazuh Payload": {
+      "main": [
+        [
+          {
+            "node": "Is Alert Valid",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Internal Alert": {
+      "main": [
+        [
+          {
+            "node": "Check Internal Threat",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Internal Threat": {
+      "main": [
+        [
+          {
+            "node": "Telegram Notify - Internal Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save to Elastic": {
+      "main": [
+        [
+          {
+            "node": "Block Decision Gate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "False Positive Check": {
+      "main": [
+        [
+          {
+            "node": "Wazuh API AR",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Token generation": {
+      "main": [
+        [
+          {
+            "node": "False Positive Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wazuh API AR": {
+      "main": [
+        [
+          {
+            "node": "Append row in sheet",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Telegram Notify - Block Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "SOC AI Assistant Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call 'Actions'1": {
+      "ai_tool": [
+        [
+          {
+            "node": "SOC AI Assistant Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false,
+    "timeSavedMode": "fixed",
+    "timezone": "Africa/Cairo",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "versionId": "e08457a9-a0de-403e-95dc-22ae88b5b8b9",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "97d8fcde9139968198c36c9498d3ea18cc0f9ef2269678200d2f764633fcfce9"
+  },
+  "id": "bV5dNz9pZcRtRrX1",
+  "tags": []
+}

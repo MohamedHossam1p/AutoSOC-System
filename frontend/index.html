@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AutoSOC System 🛡️ | Enterprise Cockpit</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login-screen">
+    <div class="login-box">
+        <div class="logo">🛡️</div>
+        <h2>AutoSOC System</h2>
+        <p>Enterprise Security Operations Center</p>
+        <select id="login-username"><option value="">Select your account...</option></select>
+        <input type="password" id="login-password" placeholder="Password" onkeydown="if(event.key==='Enter') handleLogin()">
+        <button class="btn-login" onclick="handleLogin()">🔐 Sign In</button>
+        <div class="login-error" id="login-error"></div>
+        <hr class="login-divider">
+        <div style="font-size:12px;color:#8b949e;"></div>
+    </div>
+</div>
+
+<!-- MAIN DASHBOARD -->
+<div class="dashboard-container" id="main-dashboard" style="display:none;">
+    <div class="header">
+        <h1>🛡️ AutoSOC System | Enterprise Cockpit</h1>
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+            <div class="analyst-badge">
+                <div class="analyst-avatar" id="analyst-avatar">A</div>
+                <div><span id="analyst-name-display">Analyst</span><span class="analyst-role" id="analyst-role-display">SOC Analyst</span></div>
+            </div>
+            <button class="btn-refresh" id="refresh-btn" onclick="triggerManualRefresh()">🔄 Refresh</button>
+            <div class="live-indicator"><span id="connection-status-text">Syncing...</span><span class="status-dot"></span></div>
+            <button class="btn-logout" onclick="handleLogout()">⏻ Logout</button>
+        </div>
+    </div>
+
+    <div class="tabs">
+        <button class="tab-btn active" onclick="switchTab('monitoring',this)">📡 Live Monitoring</button>
+        <button class="tab-btn" onclick="switchTab('cases',this)">🗂️ Cases <span id="open-cases-badge" style="background:var(--accent-red);color:#fff;border-radius:10px;padding:1px 7px;font-size:11px;margin-left:4px;">0</span></button>
+        <button class="tab-btn" onclick="switchTab('analytics',this)">📊 Analytics</button>
+        <button class="tab-btn" onclick="switchTab('mitre',this)">⚔️ MITRE ATT&CK</button>
+        <button class="tab-btn" onclick="switchTab('search',this)">🔍 Alert History</button>
+        <button class="tab-btn" onclick="switchTab('hunt',this)">🎯 Threat Hunting</button>
+        <button class="tab-btn" id="admin-tab-btn" onclick="switchTab('admin',this)" style="display:none;">⚙️ Admin</button>
+    </div>
+
+    <!-- TAB: LIVE MONITORING -->
+    <div id="tab-monitoring" class="tab-content active">
+        <div class="main-content-wrapper">
+            <div class="stats-side">
+                <div class="stats-grid">
+                    <div class="stat-card"><h3>Total Alerts</h3><div class="stat-value" id="stat-total">0</div></div>
+                    <div class="stat-card critical"><h3>Critical (&gt;85)</h3><div class="stat-value" id="stat-critical">0</div></div>
+                    <div class="stat-card tor"><h3>Tor Network</h3><div class="stat-value" id="stat-tor">0</div></div>
+                    <div class="stat-card top-country"><h3>Top Country</h3><div class="stat-value" id="stat-country">N/A</div></div>
+                </div>
+                <div class="stats-grid">
+                    <div class="stat-card cases-open"><h3>Open Cases</h3><div class="stat-value" id="stat-open-cases">0</div></div>
+                    <div class="stat-card cases-closed"><h3>Closed Cases</h3><div class="stat-value" id="stat-closed-cases">0</div></div>
+                </div>
+                <div class="risk-legend-card">
+                    <div class="risk-legend-title">📊 Risk Score Ranges</div>
+                    <div class="risk-legend-row"><div class="risk-legend-left"><div class="risk-dot" style="background:#ff4444;box-shadow:0 0 6px #ff4444;"></div><span class="risk-label" style="color:#ff4444;">Critical</span></div><span class="risk-range">76 – 100</span></div>
+                    <div class="risk-legend-row"><div class="risk-legend-left"><div class="risk-dot" style="background:#f2a60c;box-shadow:0 0 6px #f2a60c;"></div><span class="risk-label" style="color:#f2a60c;">High</span></div><span class="risk-range">51 – 75</span></div>
+                    <div class="risk-legend-row"><div class="risk-legend-left"><div class="risk-dot" style="background:#58a6ff;box-shadow:0 0 6px #58a6ff;"></div><span class="risk-label" style="color:#58a6ff;">Medium</span></div><span class="risk-range">26 – 50</span></div>
+                    <div class="risk-legend-row"><div class="risk-legend-left"><div class="risk-dot" style="background:#2ea043;box-shadow:0 0 6px #2ea043;"></div><span class="risk-label" style="color:#2ea043;">Low</span></div><span class="risk-range">0 – 25</span></div>
+                </div>
+            </div>
+            <div id="mapid"></div>
+        </div>
+        <div style="display:flex;gap:10px;margin-bottom:15px;align-items:center;flex-wrap:wrap;">
+            <input type="text" id="search-input" placeholder="🔍 Search by IP, Country, ISP..." style="flex-grow:1;padding:12px 18px;background:var(--panel-bg);border:1px solid var(--border-color);border-radius:8px;color:var(--text-color);font-size:14px;font-family:'IBM Plex Sans',sans-serif;">
+            <div class="sort-toolbar">
+                <span class="sort-toolbar-label">Sort by:</span>
+                <button class="sort-btn active" id="sort-time" onclick="applySort('time',this)" title="Most recent first">🕐 Time</button>
+                <button class="sort-btn" id="sort-risk-desc" onclick="applySort('risk_desc',this)" title="Highest risk first">🔴 Risk ↓</button>
+                <button class="sort-btn" id="sort-risk-asc" onclick="applySort('risk_asc',this)" title="Lowest risk first">🟢 Risk ↑</button>
+                <button class="sort-btn" id="sort-open" onclick="applySort('case_open',this)" title="Open cases first">📂 Open</button>
+                <button class="sort-btn" id="sort-investigating" onclick="applySort('case_investigating',this)" title="Investigating first">🔍 Invest.</button>
+                <button class="sort-btn" id="sort-closed" onclick="applySort('case_closed',this)" title="Closed cases first">✅ Closed</button>
+            </div>
+        </div>
+        <div class="table-container">
+            <table>
+                <thead id="logs-header"><tr>
+                    <th style="width:34px;"></th><th>Attacker IP</th><th>Country</th>
+                    <th>Max Risk</th><th>ISP</th><th>TOR</th>
+                    <th>Alerts</th><th>Last Seen</th><th>Actions</th>
+                </tr></thead>
+                <tbody id="logs-body"><tr><td colspan="9" class="empty-state">Loading from Elasticsearch...</td></tr></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- TAB: CASES -->
+    <div id="tab-cases" class="tab-content">
+        <div class="cases-toolbar">
+            <select id="case-filter-status"><option value="all">All Statuses</option><option value="Open">Open</option><option value="Investigating">Investigating</option><option value="Closed">Closed</option></select>
+            <select id="case-filter-priority"><option value="all">All Priorities</option><option value="Critical">Critical</option><option value="High">High</option><option value="Medium">Medium</option></select>
+            <input type="text" id="case-search" placeholder="🔍 Search cases..." style="flex-grow:1;">
+            <button class="btn btn-primary" onclick="openNewCaseModal()">+ New Case</button>
+        </div>
+        <div class="stats-grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:20px;">
+            <div class="stat-card"><h3>Total</h3><div class="stat-value" id="cm-total">0</div></div>
+            <div class="stat-card critical"><h3>Open</h3><div class="stat-value" id="cm-open">0</div></div>
+            <div class="stat-card tor"><h3>Investigating</h3><div class="stat-value" id="cm-investigating">0</div></div>
+            <div class="stat-card"><h3>Closed</h3><div class="stat-value" id="cm-closed" style="color:var(--accent-green);">0</div></div>
+        </div>
+        <div class="table-container">
+            <table>
+                <thead><tr><th>Case ID</th><th>Title</th><th>Attacker IP</th><th>Priority</th><th>Status</th><th>Assigned To</th><th>Created</th><th>Actions</th></tr></thead>
+                <tbody id="cases-tbody"><tr><td colspan="8" class="empty-state">Loading cases from MongoDB...</td></tr></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- TAB: ANALYTICS -->
+    <div id="tab-analytics" class="tab-content">
+        <div class="charts-grid">
+            <div class="chart-card"><h3>🌍 Top Attacker Countries</h3><div class="bar-chart" id="chart-countries"></div></div>
+            <div class="chart-card"><h3>🏢 Top ISPs</h3><div class="bar-chart" id="chart-isps"></div></div>
+            <div class="chart-card"><h3>📊 Risk Score Distribution</h3><div class="bar-chart" id="chart-risk"></div></div>
+            <div class="chart-card"><h3>🧅 TOR vs Non-TOR</h3><div class="donut-container" id="chart-tor"><canvas id="torCanvas" width="160" height="160"></canvas><div class="donut-legend" id="tor-legend"></div></div></div>
+        </div>
+        <div class="chart-card" style="margin-bottom:20px;"><h3>📅 Alerts Timeline (Last 14 Days)</h3><canvas id="timelineCanvas" height="80"></canvas></div>
+    </div>
+
+    <!-- TAB: MITRE -->
+    <div id="tab-mitre" class="tab-content">
+        <div class="mitre-section">
+            <h3>⚔️ MITRE ATT&CK — Live Coverage Map</h3>
+            <p>Real-time detection counts from Elasticsearch · Wazuh alerts with MITRE mapping</p>
+            <div class="mitre-toolbar">
+                <span style="color:#8b949e;font-size:13px;">Time range:</span>
+                <button onclick="loadMitreData(7,this)" class="active-range">Last 7 days</button>
+                <button onclick="loadMitreData(30,this)">Last 30 days</button>
+                <button onclick="loadMitreData(60,this)">Last 2 months</button>
+                <button onclick="loadMitreData(90,this)">Last 3 months</button>
+                <button onclick="loadMitreData(0,this)" style="color:var(--accent-orange);border-color:var(--accent-orange);">All Time</button>
+                <span id="mitre-last-updated" style="margin-left:auto;color:#8b949e;font-size:12px;"></span>
+            </div>
+            <div class="mitre-summary-bar">
+                <div class="mitre-summary-item"><div class="val" id="ms-total-alerts">—</div><div class="lbl">MITRE Alerts</div></div>
+                <div class="mitre-summary-divider"></div>
+                <div class="mitre-summary-item"><div class="val" id="ms-tactics">—</div><div class="lbl">Active Tactics</div></div>
+                <div class="mitre-summary-divider"></div>
+                <div class="mitre-summary-item"><div class="val" id="ms-techniques">—</div><div class="lbl">Techniques</div></div>
+                <div class="mitre-summary-divider"></div>
+                <div class="mitre-summary-item"><div class="val" id="ms-top-tactic" style="font-size:16px;color:var(--accent-red);">—</div><div class="lbl">Top Tactic</div></div>
+            </div>
+            <div class="mitre-loading" id="mitre-loading"><span class="spin">⚙️</span> Loading live MITRE data...</div>
+            <div class="mitre-live-wrapper" id="mitre-live-wrapper" style="display:none;">
+                <div class="mitre-tactics-sidebar"><h4>📌 Tactics (Live)</h4><div id="mitre-tactics-list"></div></div>
+                <div class="mitre-techniques-panel"><h4 id="mitre-techniques-header">📋 Techniques — Select a tactic</h4><div class="techniques-grid" id="mitre-techniques-grid"><div style="color:#8b949e;font-size:13px;padding:20px;">Click a tactic to see techniques.</div></div></div>
+            </div>
+            <div id="mitre-error" style="display:none;padding:20px;color:var(--accent-orange);font-size:13px;background:rgba(242,166,12,0.08);border-radius:8px;border:1px solid var(--accent-orange);">⚠️ Could not connect to Elasticsearch. Make sure proxy is running at <code style="color:var(--accent-blue);">192.168.202.129:9202</code></div>
+        </div>
+        <div class="mitre-section">
+            <h3>📋 Custom Wazuh Rules — MITRE Mapping</h3>
+            <p>Your deployed custom rules mapped to MITRE ATT&CK</p>
+            <div class="table-container">
+                <table><thead><tr><th>Rule ID</th><th>MITRE ID</th><th>Tactic</th><th>Technique</th><th>Description</th><th>Severity</th></tr></thead>
+                <tbody id="mitre-rules-tbody"></tbody></table>
+            </div>
+        </div>
+    </div>
+
+    <!-- TAB: ALERT HISTORY -->
+    <div id="tab-search" class="tab-content">
+        <div style="background:var(--panel-bg);border:1px solid var(--border-color);border-radius:12px;padding:20px;margin-bottom:20px;">
+            <h3 style="margin:0 0 15px 0;color:#fff;font-size:16px;">🔍 Search Historical Alerts — Elasticsearch</h3>
+            <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:15px;">
+                <input type="text" id="es-search-ip" placeholder="Attacker IP" style="flex:1;min-width:180px;padding:10px 14px;background:var(--bg-color);border:1px solid var(--border-color);border-radius:8px;color:var(--text-color);font-family:'IBM Plex Sans',sans-serif;font-size:14px;">
+                <input type="text" id="es-search-rule" placeholder="Rule description keyword..." style="flex:1;min-width:180px;padding:10px 14px;background:var(--bg-color);border:1px solid var(--border-color);border-radius:8px;color:var(--text-color);font-family:'IBM Plex Sans',sans-serif;font-size:14px;">
+                <input type="date" id="es-date-from" style="padding:10px 14px;background:var(--bg-color);border:1px solid var(--border-color);border-radius:8px;color:var(--text-color);font-family:'IBM Plex Sans',sans-serif;font-size:14px;">
+                <input type="date" id="es-date-to" style="padding:10px 14px;background:var(--bg-color);border:1px solid var(--border-color);border-radius:8px;color:var(--text-color);font-family:'IBM Plex Sans',sans-serif;font-size:14px;">
+                <select id="es-severity" style="padding:10px 14px;background:var(--bg-color);border:1px solid var(--border-color);border-radius:8px;color:var(--text-color);font-family:'IBM Plex Sans',sans-serif;font-size:14px;"><option value="">All Severities</option><option value="15">Level 15</option><option value="14">Level 14</option><option value="10">Level 10+</option><option value="7">Level 7+</option></select>
+                <button class="btn btn-primary" onclick="runElasticSearch()">🔍 Search</button>
+                <button class="btn btn-sm" onclick="resetSearchForm()">Clear</button>
+            </div>
+            <div id="es-status" style="font-size:13px;color:#8b949e;margin-bottom:10px;"></div>
+        </div>
+        <div class="stats-grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:20px;">
+            <div class="stat-card"><h3>Results</h3><div class="stat-value" id="es-stat-total" style="font-family:'IBM Plex Mono',monospace;">—</div></div>
+            <div class="stat-card critical"><h3>Critical (Lvl 15)</h3><div class="stat-value" id="es-stat-critical">—</div></div>
+            <div class="stat-card tor"><h3>Unique IPs</h3><div class="stat-value" id="es-stat-ips">—</div></div>
+            <div class="stat-card top-country"><h3>Date Range</h3><div class="stat-value" id="es-stat-range" style="font-size:14px;">—</div></div>
+        </div>
+        <div class="table-container">
+            <table><thead><tr><th>Timestamp</th><th>Attacker IP</th><th>Agent</th><th>Rule ID</th><th>Severity</th><th>Description</th><th>MITRE Tactic</th><th>Actions</th></tr></thead>
+            <tbody id="es-results-body"><tr><td colspan="8" class="empty-state">Use the search form above.</td></tr></tbody></table>
+        </div>
+    </div>
+
+    <!-- TAB: THREAT HUNTING -->
+    <div id="tab-hunt" class="tab-content">
+        <div style="background:var(--panel-bg);border:1px solid var(--border-color);border-radius:12px;padding:20px;margin-bottom:20px;">
+            <h3 style="margin:0 0 5px 0;color:#fff;font-size:18px;">🎯 Threat Hunting</h3>
+            <p style="margin:0;color:#8b949e;font-size:13px;">Proactively hunt for threats in your Elasticsearch data.</p>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:15px;margin-bottom:25px;">
+            <div class="hunt-card" onclick="runHuntQuery('top_attackers',event)"><div class="hunt-card-icon">🌐</div><div class="hunt-card-body"><div class="hunt-card-title">Top Attacking IPs</div><div class="hunt-card-desc">Most active source IPs in the last 7 days.</div><div class="hunt-card-tag">Reconnaissance</div></div><div class="hunt-card-arrow">▶</div></div>
+            <div class="hunt-card" onclick="runHuntQuery('brute_force',event)"><div class="hunt-card-icon">🔨</div><div class="hunt-card-body"><div class="hunt-card-title">Brute Force Detection</div><div class="hunt-card-desc">IPs with 5+ failed auth alerts in last 24h.</div><div class="hunt-card-tag hunt-tag-red">Credential Access</div></div><div class="hunt-card-arrow">▶</div></div>
+            <div class="hunt-card" onclick="runHuntQuery('off_hours',event)"><div class="hunt-card-icon">🌙</div><div class="hunt-card-body"><div class="hunt-card-title">Off-Hours Activity</div><div class="hunt-card-desc">Auth events between 12 AM and 6 AM Cairo time.</div><div class="hunt-card-tag hunt-tag-orange">Suspicious Timing</div></div><div class="hunt-card-arrow">▶</div></div>
+            <div class="hunt-card" onclick="runHuntQuery('priv_esc',event)"><div class="hunt-card-icon">⬆️</div><div class="hunt-card-body"><div class="hunt-card-title">Privilege Escalation</div><div class="hunt-card-desc">Multiple failed sudo attempts.</div><div class="hunt-card-tag hunt-tag-red">Privilege Escalation</div></div><div class="hunt-card-arrow">▶</div></div>
+            <div class="hunt-card" onclick="runHuntQuery('critical_rules',event)"><div class="hunt-card-icon">🚨</div><div class="hunt-card-body"><div class="hunt-card-title">Critical Rule Triggers</div><div class="hunt-card-desc">All Level 15 alerts in last 7 days.</div><div class="hunt-card-tag hunt-tag-red">Critical</div></div><div class="hunt-card-arrow">▶</div></div>
+            <div class="hunt-card" onclick="runHuntQuery('new_agents',event)"><div class="hunt-card-icon">🖥️</div><div class="hunt-card-body"><div class="hunt-card-title">Multi-Agent Attackers</div><div class="hunt-card-desc">IPs hitting multiple agents — lateral movement.</div><div class="hunt-card-tag hunt-tag-orange">Lateral Movement</div></div><div class="hunt-card-arrow">▶</div></div>
+            <div class="hunt-card" onclick="runHuntQuery('file_integrity',event)"><div class="hunt-card-icon">📁</div><div class="hunt-card-body"><div class="hunt-card-title">File Integrity Violations</div><div class="hunt-card-desc">Sensitive file changes detected by Wazuh FIM.</div><div class="hunt-card-tag hunt-tag-red">Impact</div></div><div class="hunt-card-arrow">▶</div></div>
+            <div class="hunt-card hunt-card-custom" onclick="document.getElementById('hunt-custom-panel').style.display='block';document.getElementById('hunt-custom-panel').scrollIntoView({behavior:'smooth'})"><div class="hunt-card-icon">✏️</div><div class="hunt-card-body"><div class="hunt-card-title">Custom Query</div><div class="hunt-card-desc">Write your own Elasticsearch hunt query.</div><div class="hunt-card-tag">Custom</div></div><div class="hunt-card-arrow">▶</div></div>
+        </div>
+        <div id="hunt-custom-panel" style="display:none;background:var(--panel-bg);border:1px solid var(--border-color);border-radius:12px;padding:20px;margin-bottom:20px;">
+            <h3 style="margin:0 0 15px 0;color:#fff;font-size:15px;">✏️ Custom Hunt Query</h3>
+            <div style="display:flex;gap:10px;margin-bottom:10px;flex-wrap:wrap;">
+                <input type="text" id="hunt-custom-keyword" placeholder="Rule keyword..." style="flex:1;min-width:200px;padding:10px 14px;background:var(--bg-color);border:1px solid var(--border-color);border-radius:8px;color:var(--text-color);font-family:'IBM Plex Sans',sans-serif;font-size:14px;">
+                <input type="text" id="hunt-custom-ip" placeholder="Specific IP (optional)" style="flex:1;min-width:180px;padding:10px 14px;background:var(--bg-color);border:1px solid var(--border-color);border-radius:8px;color:var(--text-color);font-family:'IBM Plex Sans',sans-serif;font-size:14px;">
+                <select id="hunt-custom-level" style="padding:10px 14px;background:var(--bg-color);border:1px solid var(--border-color);border-radius:8px;color:var(--text-color);font-family:'IBM Plex Sans',sans-serif;font-size:14px;"><option value="">Any Level</option><option value="15">Level 15+</option><option value="10">Level 10+</option><option value="7">Level 7+</option></select>
+                <select id="hunt-custom-days" style="padding:10px 14px;background:var(--bg-color);border:1px solid var(--border-color);border-radius:8px;color:var(--text-color);font-family:'IBM Plex Sans',sans-serif;font-size:14px;"><option value="1">Last 24h</option><option value="7" selected>Last 7 days</option><option value="30">Last 30 days</option><option value="90">Last 90 days</option></select>
+                <button class="btn btn-primary" onclick="runHuntQuery('custom',event)">🎯 Hunt</button>
+            </div>
+        </div>
+        <div id="hunt-status" style="font-size:13px;color:#8b949e;margin-bottom:15px;padding:10px 15px;background:var(--panel-bg);border-radius:8px;border:1px solid var(--border-color);display:none;"></div>
+        <div id="hunt-stats-row" style="display:none;" class="stats-grid">
+            <div class="stat-card"><h3>Hits</h3><div class="stat-value" id="hunt-stat-total" style="font-family:'IBM Plex Mono',monospace;">0</div></div>
+            <div class="stat-card critical"><h3>Critical</h3><div class="stat-value" id="hunt-stat-critical">0</div></div>
+            <div class="stat-card tor"><h3>Unique IPs</h3><div class="stat-value" id="hunt-stat-ips">0</div></div>
+            <div class="stat-card top-country"><h3>Unique Agents</h3><div class="stat-value" id="hunt-stat-agents" style="font-size:20px;">0</div></div>
+        </div>
+        <div class="table-container" id="hunt-results-container" style="display:none;">
+            <table><thead><tr><th>Timestamp</th><th>Source IP</th><th>Agent</th><th>Rule ID</th><th>Level</th><th>Description</th><th>MITRE</th><th>Actions</th></tr></thead>
+            <tbody id="hunt-results-body"></tbody></table>
+        </div>
+    </div>
+
+    <!-- TAB: ADMIN -->
+    <div id="tab-admin" class="tab-content">
+        <div class="admin-panel">
+            <h3>👥 Manage Analysts</h3>
+            <div class="admin-add-form">
+                <input type="text" id="new-analyst-name" placeholder="Full Name">
+                <input type="text" id="new-analyst-username" placeholder="Username">
+                <input type="password" id="new-analyst-password" placeholder="Password">
+                <select id="new-analyst-role"><option value="SOC Analyst">SOC Analyst</option><option value="Senior Analyst">Senior Analyst</option><option value="SOC Lead">SOC Lead</option><option value="Admin">Admin</option></select>
+                <button class="btn btn-primary" onclick="addNewAnalyst()">+ Add Analyst</button>
+            </div>
+            <div class="analysts-list" id="analysts-list"></div>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL: CASE -->
+<div class="modal-overlay" id="case-modal">
+    <div class="modal">
+        <h2 id="modal-title">📁 New Case</h2>
+        <label>Title</label><input type="text" id="modal-case-title" placeholder="e.g. SSH Brute Force from 185.x.x.x">
+        <label>Attacker IP</label><input type="text" id="modal-case-ip">
+        <label>Priority</label><select id="modal-case-priority"><option>Critical</option><option>High</option><option>Medium</option><option>Low</option></select>
+        <label>Status</label><select id="modal-case-status"><option>Open</option><option>Investigating</option><option>Closed</option></select>
+        <label>Assigned To</label><input type="text" id="modal-case-analyst">
+        <label>Description / Notes</label><textarea id="modal-case-notes" placeholder="Describe the incident..."></textarea>
+        <div class="modal-footer"><button class="btn btn-sm" onclick="closeCaseModal()">Cancel</button><button class="btn btn-primary" onclick="saveCase()">Save Case</button></div>
+    </div>
+</div>
+
+<!-- MODAL: VIEW CASE -->
+<div class="modal-overlay" id="view-modal">
+    <div class="modal" style="width:700px;">
+        <h2 id="view-modal-title">Case Details</h2>
+        <div id="view-modal-content"></div>
+        <div style="display:flex;gap:10px;margin-top:15px;">
+            <input type="text" id="new-note-input" placeholder="Add a note..." style="flex-grow:1;padding:10px;background:var(--bg-color);border:1px solid var(--border-color);border-radius:8px;color:var(--text-color);font-family:'IBM Plex Sans',sans-serif;">
+            <button class="btn btn-primary" onclick="submitNoteToCase()">Add Note</button>
+        </div>
+        <div class="notes-timeline" id="notes-timeline"></div>
+        <div class="modal-footer"><button class="btn btn-sm" onclick="closeViewModal()">Close</button></div>
+    </div>
+</div>
+
+<!-- MODAL: TECHNIQUE DRILLDOWN -->
+<div class="modal-overlay" id="technique-modal">
+    <div class="modal technique-modal-wide">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;flex-wrap:wrap;gap:10px;">
+            <div><h2 id="technique-modal-title" style="margin:0;font-size:18px;"></h2><div id="technique-modal-sub" style="font-size:12px;color:#8b949e;margin-top:4px;"></div></div>
+            <div style="display:flex;gap:8px;align-items:center;"><span id="technique-modal-count" style="background:rgba(255,68,68,0.15);color:var(--accent-red);border:1px solid var(--accent-red);border-radius:20px;padding:4px 14px;font-size:13px;font-weight:700;font-family:'IBM Plex Mono',monospace;"></span><button class="btn btn-sm" onclick="closeTechniqueModal()">✕ Close</button></div>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:18px;">
+            <div style="background:var(--bg-color);border:1px solid var(--border-color);border-radius:8px;padding:12px;text-align:center;"><div style="font-size:11px;color:#8b949e;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">Total Logs</div><div id="tm-stat-total" style="font-size:22px;font-weight:700;font-family:'IBM Plex Mono',monospace;color:#fff;">—</div></div>
+            <div style="background:var(--bg-color);border:1px solid var(--border-color);border-radius:8px;padding:12px;text-align:center;"><div style="font-size:11px;color:#8b949e;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">Unique IPs</div><div id="tm-stat-ips" style="font-size:22px;font-weight:700;font-family:'IBM Plex Mono',monospace;color:var(--accent-orange);">—</div></div>
+            <div style="background:var(--bg-color);border:1px solid var(--border-color);border-radius:8px;padding:12px;text-align:center;"><div style="font-size:11px;color:#8b949e;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">Agents</div><div id="tm-stat-agents" style="font-size:22px;font-weight:700;font-family:'IBM Plex Mono',monospace;color:var(--accent-blue);">—</div></div>
+            <div style="background:var(--bg-color);border:1px solid var(--border-color);border-radius:8px;padding:12px;text-align:center;"><div style="font-size:11px;color:#8b949e;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">Critical</div><div id="tm-stat-critical" style="font-size:22px;font-weight:700;font-family:'IBM Plex Mono',monospace;color:var(--accent-red);">—</div></div>
+        </div>
+        <div id="technique-modal-loading" style="text-align:center;padding:40px;color:#8b949e;"><span style="font-size:24px;animation:spin 1s linear infinite;display:inline-block;">⚙️</span><div style="margin-top:10px;font-size:13px;">Fetching from Elasticsearch...</div></div>
+        <div id="technique-modal-table-wrap" style="display:none;overflow-x:auto;max-height:420px;overflow-y:auto;border-radius:8px;border:1px solid var(--border-color);">
+            <table style="width:100%;border-collapse:collapse;text-align:left;font-size:13px;">
+                <thead><tr style="background:#21262d;position:sticky;top:0;z-index:2;">
+                    <th style="padding:10px 12px;color:var(--accent-blue);font-size:11px;text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid var(--border-color);">Timestamp</th>
+                    <th style="padding:10px 12px;color:var(--accent-blue);font-size:11px;text-transform:uppercase;border-bottom:1px solid var(--border-color);">Attacker IP</th>
+                    <th style="padding:10px 12px;color:var(--accent-blue);font-size:11px;text-transform:uppercase;border-bottom:1px solid var(--border-color);">Agent</th>
+                    <th style="padding:10px 12px;color:var(--accent-blue);font-size:11px;text-transform:uppercase;border-bottom:1px solid var(--border-color);">Rule ID</th>
+                    <th style="padding:10px 12px;color:var(--accent-blue);font-size:11px;text-transform:uppercase;border-bottom:1px solid var(--border-color);">Level</th>
+                    <th style="padding:10px 12px;color:var(--accent-blue);font-size:11px;text-transform:uppercase;border-bottom:1px solid var(--border-color);">Description</th>
+                    <th style="padding:10px 12px;color:var(--accent-blue);font-size:11px;text-transform:uppercase;border-bottom:1px solid var(--border-color);">Action</th>
+                </tr></thead>
+                <tbody id="technique-modal-tbody"></tbody>
+            </table>
+        </div>
+        <div id="technique-modal-empty" style="display:none;text-align:center;padding:40px;color:#8b949e;font-style:italic;">No logs found.</div>
+        <div style="margin-top:14px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;"><span id="technique-modal-showing" style="font-size:12px;color:#8b949e;"></span><button class="btn btn-sm" onclick="closeTechniqueModal()">Close</button></div>
+    </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+<script src="js/config.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/map.js"></script>
+<script src="js/alerts.js"></script>
+<script src="js/cases.js"></script>
+<script src="js/analytics.js"></script>
+<script src="js/mitre.js"></script>
+<script src="js/search.js"></script>
+<script src="js/hunting.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
